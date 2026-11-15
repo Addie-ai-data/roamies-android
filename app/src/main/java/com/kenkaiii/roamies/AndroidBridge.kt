@@ -6,7 +6,8 @@ class AndroidBridge(
     private val onHitRectsUpdated: (List<android.graphics.Rect>) -> Unit,
     private val onHotChanged: (Boolean) -> Unit,
     private val onSidecarMessageReceived: (String) -> Unit,
-    private val onVoiceRequested: () -> Unit
+    private val onVoiceRequested: () -> Unit,
+    private val onPomodoroDone: ((String) -> Unit)? = null
 ) {
 
     @JavascriptInterface
@@ -14,7 +15,6 @@ class AndroidBridge(
         try {
             val arr = org.json.JSONArray(rectsJson)
             val rectList = mutableListOf<android.graphics.Rect>()
-            // arr format: [x1, y1, w1, h1, x2, y2, w2, h2, ...]
             var i = 0
             while (i + 3 < arr.length()) {
                 val x = arr.getInt(i)
@@ -46,7 +46,12 @@ class AndroidBridge(
     }
 
     @JavascriptInterface
+    fun onPomodoroCompleted(label: String) {
+        onPomodoroDone?.invoke(label)
+    }
+
+    @JavascriptInterface
     fun setTyping(typing: Boolean) {
-        // Can adjust soft input mode if needed
+        // Soft input mode helper
     }
 }

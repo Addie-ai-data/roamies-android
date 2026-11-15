@@ -2,12 +2,17 @@ package com.kenkaiii.roamies
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -82,9 +87,9 @@ class MainActivity : AppCompatActivity() {
         mainHandler.postDelayed({
             activityScope.launch {
                 if (auth.apiKey.isBlank()) {
-                    ttsClient.speak("Hello! I am ${auth.character.displayName}. Tap the settings icon at the top right to paste your Gemini API key so we can chat!")
+                    ttsClient.speak("J.A.R.V.I.S. online. Tap the settings icon at the top right to paste your Gemini API key so we can chat, sir!")
                 } else {
-                    ttsClient.speak("At your service.")
+                    ttsClient.speak("J.A.R.V.I.S. online and standing by. How may I assist you, sir?")
                 }
             }
         }, 1500L)
@@ -105,13 +110,10 @@ class MainActivity : AppCompatActivity() {
         chipSarah = findViewById(R.id.chipSarah)
         chipAdrian = findViewById(R.id.chipAdrian)
 
-        tvActiveBuddy.text = auth.character.displayName
-        btnToggleSize.text = "Size: ${auth.size.displayName}"
-
         btnToggleSize.setOnClickListener {
-            val sizes = RoamieSize.entries
-            val nextIndex = (auth.size.ordinal + 1) % sizes.size
-            auth.size = sizes[nextIndex]
+            val sizes = RoamieSize.values()
+            val nextIdx = (auth.size.ordinal + 1) % sizes.size
+            auth.size = sizes[nextIdx]
             btnToggleSize.text = "Size: ${auth.size.displayName}"
             evalJs("RoamieAndroid.setSize('${auth.size.id}');")
         }
@@ -138,7 +140,13 @@ class MainActivity : AppCompatActivity() {
             onHitRectsUpdated = {},
             onHotChanged = {},
             onSidecarMessageReceived = {},
-            onVoiceRequested = { startVoiceListening() }
+            onVoiceRequested = { startVoiceListening() },
+            onPomodoroDone = { label ->
+                vibratePhone()
+                activityScope.launch {
+                    ttsClient.speak("Focus session complete, sir. 25 minutes concluded. May I suggest a 5-minute break?")
+                }
+            }
         )
         webView.addJavascriptInterface(bridge, "AndroidBridge")
 
@@ -154,11 +162,28 @@ class MainActivity : AppCompatActivity() {
         webView.loadUrl("file:///android_asset/roamies/desktop.html")
     }
 
+    private fun vibratePhone() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                vibratorManager?.defaultVibrator?.vibrate(VibrationEffect.createOneShot(500, VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                @Suppress("DEPRECATION")
+                val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    vibrator?.vibrate(VibrationEffect.createOneShot(500, VibrationEffect.DEFAULT_AMPLITUDE))
+                } else {
+                    @Suppress("DEPRECATION")
+                    vibrator?.vibrate(500)
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     private fun setupCharacterChips() {
         val updateChipHighlight = {
-            val cyan = ContextCompat.getColor(this, R.color.accent_cyan)
-            val dim = ContextCompat.getColor(this, R.color.border_color)
-
             chipJarvis.strokeColor = ContextCompat.getColorStateList(this, if (auth.character == RoamieCharacter.JARVIS) R.color.accent_cyan else R.color.border_color)
             chipRoamie.strokeColor = ContextCompat.getColorStateList(this, if (auth.character == RoamieCharacter.ROAMIE) R.color.accent_cyan else R.color.border_color)
             chipAnime.strokeColor = ContextCompat.getColorStateList(this, if (auth.character == RoamieCharacter.ANIME) R.color.accent_cyan else R.color.border_color)
@@ -193,7 +218,11 @@ class MainActivity : AppCompatActivity() {
 
         etUserPrompt.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEND) {
-                btnSend.performClick()
+                val text = etUserPrompt.text.toString().trim()
+                if (text.isNotEmpty()) {
+                    etUserPrompt.setText("")
+                    sendUserMessage(text)
+                }
                 true
             } else {
                 false
@@ -211,6 +240,37 @@ class MainActivity : AppCompatActivity() {
 
     private fun sendUserMessage(userText: String) {
         activityScope.launch {
+            val lower = userText.lowercase()
+
+            // Quick client-side intercept for Pomodoro commands
+            if (lower.contains("pomodoro") || lower.contains("focus timer") || lower.contains("start focus") || lower.contains("focus sprint")) {
+                var seconds = 1500L // 25 min
+                if (lower.contains("5 min") || lower.contains("break")) seconds = 300L
+                else if (lower.contains("10 min")) seconds = 600L
+                else if (lower.contains("15 min")) seconds = 900L
+                else if (lower.contains("30 min")) seconds = 1800L
+                else if (lower.contains("45 min")) seconds = 2700L
+                else if (lower.contains("60 min") || lower.contains("1 hour")) seconds = 3600L
+
+                evalJs("window.RoamieAndroid?.startPomodoro($seconds, 'Focus Sprint');")
+                val reply = "Focus sprint initiated, sir. ${seconds / 60} minutes on the clock. All distractions filtered."
+                evalJs("window.Roamie?.agent?.say('$reply');")
+                ttsClient.speak(reply)
+                return@launch
+            } else if (lower.contains("pause timer") || lower.contains("pause pomodoro")) {
+                evalJs("window.RoamieAndroid?.pausePomodoro();")
+                val reply = "Timer paused, sir."
+                evalJs("window.Roamie?.agent?.say('$reply');")
+                ttsClient.speak(reply)
+                return@launch
+            } else if (lower.contains("reset timer") || lower.contains("stop pomodoro") || lower.contains("cancel pomodoro")) {
+                evalJs("window.RoamieAndroid?.resetPomodoro();")
+                val reply = "Pomodoro timer reset, sir."
+                evalJs("window.Roamie?.agent?.say('$reply');")
+                ttsClient.speak(reply)
+                return@launch
+            }
+
             evalJs("RoamieAndroid.showHandsBadge('Thinking...');")
             val turn = llmClient.executeTurn(userText)
             evalJs("RoamieAndroid.showHandsBadge(null);")
@@ -224,7 +284,15 @@ class MainActivity : AppCompatActivity() {
 
             // Execute structured tools
             for (tool in turn.toolCalls) {
-                if (tool.tool.equals("draw_ink_card", true)) {
+                if (tool.tool.equals("start_pomodoro", true)) {
+                    val sec = if (tool.delaySeconds > 0) tool.delaySeconds else 1500L
+                    val lbl = tool.text ?: "Focus Sprint"
+                    evalJs("window.RoamieAndroid?.startPomodoro($sec, '$lbl');")
+                } else if (tool.tool.equals("pause_pomodoro", true)) {
+                    evalJs("window.RoamieAndroid?.pausePomodoro();")
+                } else if (tool.tool.equals("reset_pomodoro", true)) {
+                    evalJs("window.RoamieAndroid?.resetPomodoro();")
+                } else if (tool.tool.equals("draw_ink_card", true)) {
                     val title = tool.cardTitle ?: "Insight"
                     val bulletsJson = org.json.JSONArray(tool.cardBullets).toString()
                     evalJs("RoamieAndroid.drawCard('$title', $bulletsJson, '${tool.diagramType ?: "CARD"}');")
@@ -288,49 +356,42 @@ class MainActivity : AppCompatActivity() {
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_settings, null)
         val spinnerProv: Spinner = dialogView.findViewById(R.id.dialogSpinnerProvider)
         val etModel: EditText = dialogView.findViewById(R.id.dialogEtModel)
-        val etApiKey: EditText = dialogView.findViewById(R.id.dialogEtApiKey)
-        val btnSave: MaterialButton = dialogView.findViewById(R.id.dialogBtnSave)
+        val etKey: EditText = dialogView.findViewById(R.id.dialogEtApiKey)
 
-        val providers = listOf("gemini", "openai", "anthropic", "ollama")
-        spinnerProv.adapter = ArrayAdapter(
-            this,
-            android.R.layout.simple_spinner_dropdown_item,
-            providers.map { it.uppercase() }
-        )
-        val pIndex = providers.indexOf(auth.provider.lowercase()).coerceAtLeast(0)
-        spinnerProv.setSelection(pIndex)
+        val providers = listOf("Gemini", "OpenAI", "Anthropic")
+        spinnerProv.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, providers)
+        val provIndex = providers.indexOfFirst { it.equals(auth.provider, ignoreCase = true) }.coerceAtLeast(0)
+        spinnerProv.setSelection(provIndex)
 
-        etModel.setText(auth.modelId)
-        etApiKey.setText(auth.apiKey)
+        etModel.setText(auth.model.ifBlank { "gemini-1.5-flash" })
+        etKey.setText(auth.apiKey)
 
-        val dialog = AlertDialog.Builder(this)
+        AlertDialog.Builder(this)
+            .setTitle("Companion Intelligence Settings")
             .setView(dialogView)
-            .create()
-
-        btnSave.setOnClickListener {
-            auth.provider = providers[spinnerProv.selectedItemPosition]
-            auth.modelId = etModel.text.toString().trim()
-            auth.apiKey = etApiKey.text.toString().trim()
-            dialog.dismiss()
-            Toast.makeText(this, "API Key Saved! Say hello to your Roamie.", Toast.LENGTH_SHORT).show()
-            activityScope.launch {
-                ttsClient.speak("Settings saved! What would you like to explore today?")
+            .setPositiveButton("Save") { _, _ ->
+                auth.provider = spinnerProv.selectedItem.toString().lowercase()
+                auth.model = etModel.text.toString().trim().ifBlank { "gemini-1.5-flash" }
+                auth.apiKey = etKey.text.toString().trim()
+                Toast.makeText(this, "Settings saved! J.A.R.V.I.S. is ready.", Toast.LENGTH_SHORT).show()
+                activityScope.launch {
+                    ttsClient.speak("Settings updated, sir. Arc Reactor and Gemini 1.5 Flash are calibrated.")
+                }
             }
-        }
-
-        dialog.show()
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
-    private fun evalJs(code: String) {
+    private fun evalJs(script: String) {
         mainHandler.post {
-            webView.evaluateJavascript(code, null)
+            webView.evaluateJavascript(script, null)
         }
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        ttsClient.destroy()
         speechRecognizer?.destroy()
+        ttsClient.destroy()
         activityScope.cancel()
     }
 }

@@ -63,5 +63,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          cp app/build/outputs/apk/release/app-release.apk roamies-v0.4.0-stark-pomodoro.apk
+          gh release upload v0.2.0 roamies-v0.4.0-stark-pomodoro.apk --clobber || true
           cp app/build/outputs/apk/release/app-release.apk roamies-v0.3.0-standalone.apk
           gh release upload v0.2.0 roamies-v0.3.0-standalone.apk --clobber || true

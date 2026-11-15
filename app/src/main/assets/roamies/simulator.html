@@ -1,0 +1,622 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JARVIS & Roamies - Stark HUD Companion (Inspired by AnaaySampat/jarvis)</title>
+<script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+<style>
+  body {
+    background: radial-gradient(circle at 50% 20%, #03141f 0%, #02090e 50%, #010406 100%);
+    color: #e2e8f0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh;
+    margin: 0;
+  }
+  .phone-frame {
+    width: 390px;
+    height: 780px;
+    border-radius: 46px;
+    border: 8px solid #0f2738;
+    box-shadow: 0 25px 60px -15px rgba(0,0,0,0.9), 0 0 50px rgba(0, 229, 255, 0.2);
+    position: relative;
+    overflow: hidden;
+    background: #02070b;
+  }
+  .hud-frame {
+    position: relative;
+  }
+  .hud-frame::before {
+    content: ""; position: absolute; inset: -1px; pointer-events: none;
+    --c: #00e5ff;
+    background:
+      linear-gradient(var(--c), var(--c)) top left / 16px 2px,
+      linear-gradient(var(--c), var(--c)) top left / 2px 16px,
+      linear-gradient(var(--c), var(--c)) top right / 16px 2px,
+      linear-gradient(var(--c), var(--c)) top right / 2px 16px,
+      linear-gradient(var(--c), var(--c)) bottom left / 16px 2px,
+      linear-gradient(var(--c), var(--c)) bottom left / 2px 16px,
+      linear-gradient(var(--c), var(--c)) bottom right / 16px 2px,
+      linear-gradient(var(--c), var(--c)) bottom right / 2px 16px;
+    background-repeat: no-repeat;
+    opacity: 0.9;
+    z-index: 10;
+  }
+  .pill-chip {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .pill-chip.active {
+    background: #00e5ff;
+    color: #02070b;
+    box-shadow: 0 0 14px rgba(0, 229, 255, 0.7);
+    font-weight: 700;
+  }
+  /* 36-bar AnaaySampat waveform */
+  .im-wave {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    height: 28px;
+    width: 100%;
+  }
+  .im-wave span {
+    flex: 1;
+    max-width: 4px;
+    height: 4px;
+    background: #00e5ff;
+    border-radius: 2px;
+    opacity: 0.45;
+    transition: height 0.08s ease, opacity 0.08s ease;
+  }
+  .im-wave.active span {
+    opacity: 0.95;
+    box-shadow: 0 0 8px rgba(0, 229, 255, 0.8);
+  }
+</style>
+</head>
+<body class="flex flex-col items-center justify-center p-4 lg:p-8">
+
+  <!-- Header -->
+  <div class="text-center mb-6 max-w-xl">
+    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-950/80 border border-cyan-500/30 text-cyan-400 text-xs font-mono font-medium mb-3">
+      <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shadow-sm shadow-cyan-400"></span>
+      STARK INDUSTRIES // JARVIS OS (AnaaySampat/jarvis Inspired)
+    </div>
+    <h1 class="text-2xl lg:text-3xl font-bold tracking-tight text-white mb-2 font-mono">JARVIS STARK HUD & ROAMIES</h1>
+    <p class="text-slate-400 text-xs">Bringing together Roamies' animated companion engine and AnaaySampat's Iron Man Arc Reactor, counter-rotating rings, 36-bar audio spectrum, and specialist agents.</p>
+  </div>
+
+  <div class="flex flex-col lg:flex-row items-center justify-center gap-8 w-full max-w-5xl">
+
+    <!-- Phone Frame -->
+    <div class="phone-frame flex flex-col shrink-0">
+      
+      <!-- Top Speaker Notch & Telemetry Bar -->
+      <div class="h-10 w-full flex items-center justify-between px-6 pt-2 z-20 text-[10px] text-cyan-500/80 font-mono select-none border-b border-cyan-950">
+        <span class="font-bold text-cyan-300">JARVIS 2.5</span>
+        <div class="w-16 h-3.5 bg-cyan-950/60 rounded-full flex items-center justify-center border border-cyan-800/40">
+          <div class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span>PWR: 100%</span>
+          <span>5G</span>
+        </div>
+      </div>
+
+      <!-- In-App Top Bar (HUD Switches) -->
+      <div class="px-3 py-2 z-20 flex flex-col gap-2 bg-gradient-to-b from-[#02070b]/95 to-transparent">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold tracking-wider text-cyan-400 font-mono uppercase">STARK COMPANION</span>
+          <div class="flex items-center gap-1.5">
+            <button onclick="triggerEmote('wave')" class="px-2 py-0.5 rounded text-[11px] bg-cyan-950 text-cyan-300 border border-cyan-800 hover:bg-cyan-900">👋 Wave</button>
+            <button onclick="triggerEmote('hype')" class="px-2 py-0.5 rounded text-[11px] bg-cyan-950 text-cyan-300 border border-cyan-800 hover:bg-cyan-900">⚡ Overclock</button>
+            <button onclick="toggleRipple()" id="rippleBtn" class="px-2 py-0.5 rounded text-[11px] bg-cyan-950 border border-cyan-500/50 text-cyan-300 hover:bg-cyan-900">🔊 Voice</button>
+          </div>
+        </div>
+
+        <!-- Centerpiece Looks (Arc Reactor + Roamies Looks) -->
+        <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar">
+          <button onclick="switchLook('reactor')" id="pill-reactor" class="pill-chip active px-3 py-1 rounded-full bg-slate-900 text-slate-300 border border-slate-700 whitespace-nowrap font-mono text-[11px]">⚡ Arc Reactor</button>
+          <button onclick="switchLook('jarvis')" id="pill-jarvis" class="pill-chip px-3 py-1 rounded-full bg-slate-900 text-slate-300 border border-slate-700 whitespace-nowrap font-mono text-[11px]">✨ 3D Sphere</button>
+          <button onclick="switchLook('classic')" id="pill-classic" class="pill-chip px-3 py-1 rounded-full bg-slate-900 text-slate-300 border border-slate-700 whitespace-nowrap font-mono text-[11px]">🐾 Roamie</button>
+          <button onclick="switchLook('anime')" id="pill-anime" class="pill-chip px-3 py-1 rounded-full bg-slate-900 text-slate-300 border border-slate-700 whitespace-nowrap font-mono text-[11px]">🌸 Anime</button>
+          <button onclick="switchLook('sarah')" id="pill-sarah" class="pill-chip px-3 py-1 rounded-full bg-slate-900 text-slate-300 border border-slate-700 whitespace-nowrap font-mono text-[11px]">👩 Sarah</button>
+        </div>
+      </div>
+
+      <!-- Main Canvas Stage with Iron Man Corner Brackets -->
+      <div class="hud-frame relative flex-1 w-full overflow-hidden bg-[#02070b] flex flex-col items-center justify-center">
+        <canvas id="simStage" width="390" height="360" class="w-full h-full block cursor-pointer"></canvas>
+
+        <!-- Speech bubble -->
+        <div id="simBubble" class="absolute top-4 left-4 right-4 bg-slate-950/95 border border-cyan-500/60 rounded-xl px-3 py-2 text-xs text-cyan-200 shadow-xl backdrop-blur transition-opacity duration-300 opacity-0 pointer-events-none z-20 font-mono">
+          <span id="simBubbleText">...</span>
+        </div>
+
+        <!-- AnaaySampat 36-Bar Audio Waveform -->
+        <div class="absolute bottom-8 left-6 right-6 pointer-events-none z-10">
+          <div id="simWaveform" class="im-wave"></div>
+        </div>
+
+        <!-- Status Footer in Stage -->
+        <div class="absolute bottom-2 left-4 right-4 flex items-center justify-between text-[10px] text-cyan-600 font-mono pointer-events-none z-10">
+          <span id="simLookLabel">ARC REACTOR // MARK VII</span>
+          <span id="simStatusLabel" class="text-cyan-400">STATUS: IDLE</span>
+        </div>
+      </div>
+
+      <!-- Specialist Agents Row -->
+      <div class="px-3 py-1.5 bg-[#030d14] border-t border-cyan-950 flex items-center justify-between text-[11px] font-mono">
+        <span class="text-cyan-500 text-[10px]">AGENT:</span>
+        <div class="flex items-center gap-1.5">
+          <button onclick="setAgent('auto')" id="ag-auto" class="px-2 py-0.5 rounded bg-cyan-900/60 text-cyan-300 border border-cyan-700 text-[10px]">Auto</button>
+          <button onclick="setAgent('research')" id="ag-research" class="px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800 text-[10px]">@research</button>
+          <button onclick="setAgent('phone')" id="ag-phone" class="px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800 text-[10px]">@phone</button>
+          <button onclick="setAgent('scheduler')" id="ag-scheduler" class="px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800 text-[10px]">@scheduler</button>
+        </div>
+      </div>
+
+      <!-- In-App Bottom Chat Bar -->
+      <div class="p-3 bg-[#02070b] border-t border-cyan-950 z-20 flex flex-col gap-2">
+        <div class="flex items-center gap-2">
+          <input id="chatInput" type="text" placeholder="Say 'Hey Jarvis' or type a command..." onkeydown="if(event.key==='Enter') sendChat();" class="flex-1 bg-slate-950 border border-cyan-900/80 rounded-xl px-3 py-2 text-xs text-cyan-100 placeholder-slate-600 focus:outline-none focus:border-cyan-500 font-mono">
+          <button onclick="sendChat()" class="px-3 py-2 bg-cyan-600 hover:bg-cyan-500 text-slate-950 text-xs font-bold rounded-xl transition shadow">Send</button>
+          <button onclick="simulateMic()" title="Push to talk" class="p-2 bg-slate-950 hover:bg-cyan-950 border border-cyan-900 text-cyan-400 rounded-xl transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 02-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg>
+          </button>
+        </div>
+        <div class="flex items-center justify-between text-[10px] text-slate-500 px-1 font-mono">
+          <span>AI: <span class="text-cyan-400 font-bold">Gemini 1.5 Flash</span></span>
+          <span class="text-emerald-400 font-bold">Android 16 Standalone</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right HUD Side Information & Control Deck -->
+    <div class="flex-1 max-w-md flex flex-col gap-4">
+
+      <div class="bg-slate-950/80 border border-cyan-950 rounded-2xl p-5 shadow-lg">
+        <h3 class="text-sm font-bold font-mono text-cyan-400 mb-2 flex items-center gap-2 uppercase tracking-wider">
+          <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+          Inspirations from AnaaySampat/jarvis
+        </h3>
+        <ul class="text-xs text-slate-300 space-y-2 mb-4">
+          <li class="flex items-start gap-2">
+            <span class="text-cyan-400 font-mono">01.</span>
+            <span><strong>Arc Reactor Centerpiece</strong>: Multi-layer counter-rotating rings (outer dotted, tick ring, breathing rim, segmented arcs, and inner gauges) with glowing Stark core.</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="text-cyan-400 font-mono">02.</span>
+            <span><strong>36-Bar Audio Waveform Spectrum</strong>: Direct frequency spectrum visualizer below the centerpiece that dances in sync with voice replies.</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="text-cyan-400 font-mono">03.</span>
+            <span><strong>Specialist Agents Routing</strong>: Instant switches between Auto, <code class="text-cyan-400 font-mono">@research</code> (live search), <code class="text-cyan-400 font-mono">@phone</code> (apps/controls), and <code class="text-cyan-400 font-mono">@scheduler</code>.</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="text-cyan-400 font-mono">04.</span>
+            <span><strong>Zero-Friction Android 16 APK</strong>: Completely removed restricted overlay services so it runs safely and smoothly.</span>
+          </li>
+        </ul>
+
+        <div class="pt-3 border-t border-cyan-950 flex flex-col gap-2">
+          <label class="text-[11px] font-mono text-cyan-400 uppercase">Test Voice Commands</label>
+          <div class="grid grid-cols-2 gap-2">
+            <button onclick="testCommand('Hey Jarvis, run a diagnostic')" class="px-2.5 py-1.5 bg-slate-900 hover:bg-cyan-950 text-left text-xs rounded-lg border border-cyan-900/60 text-slate-300 font-mono">
+              ⚡ System Diagnostic
+            </button>
+            <button onclick="testCommand('Hey Jarvis, what is on my schedule?')" class="px-2.5 py-1.5 bg-slate-900 hover:bg-cyan-950 text-left text-xs rounded-lg border border-cyan-900/60 text-slate-300 font-mono">
+              📅 Schedule Check
+            </button>
+            <button onclick="testCommand('Tell @research to find the latest news on AI')" class="px-2.5 py-1.5 bg-slate-900 hover:bg-cyan-950 text-left text-xs rounded-lg border border-cyan-900/60 text-slate-300 font-mono">
+              🔍 @research Query
+            </button>
+            <button onclick="triggerEmote('hype')" class="px-2.5 py-1.5 bg-slate-900 hover:bg-cyan-950 text-left text-xs rounded-lg border border-cyan-900/60 text-slate-300 font-mono">
+              🚀 Overclock Reactor
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Download Box -->
+      <div class="bg-gradient-to-br from-cyan-950/40 to-slate-950 border border-cyan-900/50 rounded-2xl p-5">
+        <h4 class="text-xs font-bold font-mono text-white mb-2 flex items-center justify-between">
+          <span class="text-cyan-400">STANDALONE APK v0.3.0</span>
+          <span class="text-emerald-400 font-mono">READY</span>
+        </h4>
+        <p class="text-xs text-slate-400 mb-3">Saved directly to your phone's internal storage in the <code class="text-cyan-300">roamies</code> folder and downloadable on GitHub.</p>
+        <div class="flex items-center gap-2">
+          <a href="https://github.com/Addie-ai-data/roamies-android/releases/download/v0.2.0/roamies-v0.3.0-standalone.apk" class="flex-1 text-center py-2 px-3 bg-cyan-600 hover:bg-cyan-500 text-slate-950 rounded-xl text-xs font-bold shadow">
+            Download APK (v0.3.0)
+          </a>
+          <a href="https://github.com/Addie-ai-data/roamies-android" target="_blank" class="py-2 px-3 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-xl text-xs border border-slate-700 font-mono">
+            GitHub
+          </a>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+<script>
+const canvas = document.getElementById('simStage');
+const ctx = canvas.getContext('2d');
+let currentLook = 'reactor';
+let currentAgent = 'auto';
+let isRippling = false;
+let rippleDuration = 0;
+let emote = null;
+let emoteTimer = 0;
+let t = 0;
+
+// Build 36-bar waveform
+const waveContainer = document.getElementById('simWaveform');
+for (let i = 0; i < 36; i++) {
+  const bar = document.createElement('span');
+  bar.id = 'swb-' + i;
+  waveContainer.appendChild(bar);
+}
+
+// Golden spiral sphere for JARVIS 3D Sphere
+const DOT_COUNT = 400;
+const SPHERE = Array.from({ length: DOT_COUNT }, (_, i) => {
+  const y = 1 - (2 * (i + 0.5)) / DOT_COUNT;
+  const r = Math.sqrt(Math.max(0, 1 - y * y));
+  const a = i * 2.39996;
+  return [Math.cos(a) * r, y, Math.sin(a) * r];
+});
+
+let yaw = 0;
+let pitch = -0.25;
+
+let bubbleTimer = null;
+function showSpeech(text, duration = 3500) {
+  const el = document.getElementById('simBubble');
+  const txt = document.getElementById('simBubbleText');
+  txt.textContent = text;
+  el.style.opacity = '1';
+  startRipple(duration);
+  if (bubbleTimer) clearTimeout(bubbleTimer);
+  bubbleTimer = setTimeout(() => { el.style.opacity = '0'; }, duration);
+}
+
+function startRipple(ms = 3000) {
+  rippleDuration = ms;
+  isRippling = true;
+  document.getElementById('simWaveform').classList.add('active');
+  document.getElementById('simStatusLabel').textContent = "STATUS: SPEAKING";
+  document.getElementById('rippleBtn').className = "px-2 py-0.5 rounded text-[11px] bg-cyan-600 border border-cyan-400 text-slate-950 font-bold";
+}
+
+function toggleRipple() {
+  if (isRippling) {
+    isRippling = false;
+    rippleDuration = 0;
+    document.getElementById('simWaveform').classList.remove('active');
+    document.getElementById('simStatusLabel').textContent = "STATUS: IDLE";
+    document.getElementById('rippleBtn').className = "px-2 py-0.5 rounded text-[11px] bg-cyan-950 border border-cyan-500/50 text-cyan-300 hover:bg-cyan-900";
+  } else {
+    startRipple(6000);
+  }
+}
+
+function triggerEmote(name) {
+  emote = name;
+  emoteTimer = 120;
+  if (name === 'wave') showSpeech("Greetings, sir. JARVIS online and standing by.");
+  if (name === 'hype') showSpeech("Arc Reactor output overclocked to 100%.");
+}
+
+function switchLook(look) {
+  currentLook = look;
+  document.querySelectorAll('.pill-chip').forEach(el => el.classList.remove('active'));
+  const btn = document.getElementById('pill-' + look);
+  if (btn) btn.classList.add('active');
+
+  const labels = {
+    reactor: 'ARC REACTOR // MARK VII',
+    jarvis: 'JARVIS 3D WAVE SPHERE',
+    classic: 'ROAMIE PIXEL BUDDY',
+    anime: 'ANIME GIRL HOLOGRAM',
+    sarah: 'SARAH HOLOGRAM'
+  };
+  document.getElementById('simLookLabel').textContent = labels[look] || look;
+  showSpeech(`Display switched to ${labels[look]}.`, 2000);
+}
+
+function setAgent(agent) {
+  currentAgent = agent;
+  ['auto', 'research', 'phone', 'scheduler'].forEach(a => {
+    const el = document.getElementById('ag-' + a);
+    if (el) {
+      if (a === agent) {
+        el.className = "px-2 py-0.5 rounded bg-cyan-900/60 text-cyan-300 border border-cyan-700 text-[10px]";
+      } else {
+        el.className = "px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800 text-[10px]";
+      }
+    }
+  });
+  showSpeech(`Specialist routed: @${agent}`, 1800);
+}
+
+function testCommand(cmd) {
+  document.getElementById('chatInput').value = cmd;
+  sendChat();
+}
+
+function sendChat() {
+  const inp = document.getElementById('chatInput');
+  const val = inp.value.trim();
+  if (!val) return;
+  inp.value = '';
+  document.getElementById('simStatusLabel').textContent = "STATUS: PROCESSING";
+  showSpeech("Processing command...", 1000);
+  setTimeout(() => {
+    if (val.toLowerCase().includes('diagnostic') || val.toLowerCase().includes('status')) {
+      showSpeech("All subsystems nominal. Arc reactor core operating at peak efficiency.");
+    } else if (val.toLowerCase().includes('schedule')) {
+      showSpeech("Scheduler: No conflicting appointments found for today, sir.");
+    } else if (val.toLowerCase().includes('research')) {
+      showSpeech("@research agent deployed: Synthesizing real-time results from the web.");
+    } else {
+      showSpeech(`Command received: "${val}". Gemini 1.5 Flash dispatched response.`);
+    }
+  }, 900);
+}
+
+function simulateMic() {
+  document.getElementById('simStatusLabel').textContent = "STATUS: LISTENING";
+  showSpeech("Listening... (Hey Jarvis)", 1500);
+  setTimeout(() => {
+    showSpeech("Voice captured. Audio waveform synchronized with Android TTS.");
+  }, 1500);
+}
+
+// Render loop
+function render() {
+  t += 0.016;
+  if (rippleDuration > 0) {
+    rippleDuration -= 16;
+    if (rippleDuration <= 0) {
+      isRippling = false;
+      document.getElementById('simWaveform').classList.remove('active');
+      document.getElementById('simStatusLabel').textContent = "STATUS: IDLE";
+      document.getElementById('rippleBtn').className = "px-2 py-0.5 rounded text-[11px] bg-cyan-950 border border-cyan-500/50 text-cyan-300 hover:bg-cyan-900";
+    }
+  }
+  if (emoteTimer > 0) emoteTimer--;
+
+  // Update waveform
+  for (let i = 0; i < 36; i++) {
+    const bar = document.getElementById('swb-' + i);
+    if (bar) {
+      const curve = Math.sin(((i + 0.5) / 36) * Math.PI);
+      let h = 4;
+      if (isRippling) {
+        const freq = Math.abs(Math.sin(t * 14 + i * 0.45));
+        h = Math.max(4, curve * (8 + freq * 20));
+      } else {
+        h = Math.max(3, curve * (3 + Math.sin(t * 2 + i * 0.2) * 2));
+      }
+      bar.style.height = h.toFixed(1) + 'px';
+    }
+  }
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const cx = canvas.width / 2;
+  const cy = canvas.height / 2 - 12;
+
+  if (currentLook === 'reactor') {
+    renderReactor(cx, cy);
+  } else if (currentLook === 'jarvis') {
+    renderJarvis(cx, cy);
+  } else if (currentLook === 'classic') {
+    renderClassic(cx, cy);
+  } else {
+    renderHuman(cx, cy, currentLook);
+  }
+
+  requestAnimationFrame(render);
+}
+
+function renderReactor(cx, cy) {
+  const speed = isRippling ? 2.2 : (emote === 'hype' && emoteTimer > 0) ? 3.0 : 0.6;
+  const R = 85;
+  const pulse = 0.5 + 0.5 * Math.sin(t * (isRippling ? 6 : 2));
+
+  // Breathing radial glow
+  const glow = ctx.createRadialGradient(cx, cy, 10, cx, cy, R * 1.4);
+  glow.addColorStop(0, 'rgba(0, 229, 255, 0.45)');
+  glow.addColorStop(0.7, 'rgba(0, 229, 255, 0.1)');
+  glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(cx, cy, R * 1.4, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Outer dotted ring (Rotating clockwise)
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(t * speed * 0.25);
+  for (let i = 0; i < 72; i++) {
+    const a = (i / 72) * Math.PI * 2;
+    const on = i % 3 !== 0;
+    ctx.beginPath();
+    ctx.arc(Math.cos(a) * R * 0.98, Math.sin(a) * R * 0.98, on ? 1.8 : 3.0, 0, Math.PI * 2);
+    ctx.fillStyle = on ? 'rgba(0, 229, 255, 0.35)' : 'rgba(0, 229, 255, 0.85)';
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // Tick ring (Rotating clockwise)
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(t * speed * 0.5);
+  for (let i = 0; i < 60; i++) {
+    const a = (i / 60) * Math.PI * 2;
+    const longTick = i % 5 === 0;
+    const r0 = R * (longTick ? 0.78 : 0.84);
+    const r1 = R * 0.91;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * r0, Math.sin(a) * r0);
+    ctx.lineTo(Math.cos(a) * r1, Math.sin(a) * r1);
+    ctx.lineWidth = longTick ? 2.5 : 1.4;
+    ctx.strokeStyle = longTick ? 'rgba(0, 229, 255, 0.85)' : 'rgba(0, 229, 255, 0.35)';
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Segmented arcs (Counter-clockwise)
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-t * speed * 0.7);
+  for (let i = 0; i < 7; i++) {
+    const a0 = (i / 7) * Math.PI * 2 + 0.15;
+    const a1 = a0 + ((Math.PI * 2) / 7) * 0.52;
+    ctx.beginPath();
+    ctx.arc(0, 0, R * 0.72, a0, a1);
+    ctx.lineWidth = 3.6;
+    ctx.strokeStyle = 'rgba(0, 229, 255, 0.8)';
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Inner gauge arcs (Clockwise)
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(t * speed * 0.9);
+  ctx.beginPath();
+  ctx.arc(0, 0, R * 0.58, -0.4, 1.7);
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = 'rgba(0, 229, 255, 0.95)';
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(0, 0, R * 0.58, Math.PI - 0.4, Math.PI + 1.2);
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = 'rgba(0, 229, 255, 0.5)';
+  ctx.stroke();
+  ctx.restore();
+
+  // Breathing Core
+  const coreR = R * 0.36 * (1 + pulse * 0.08);
+  const coreGrad = ctx.createRadialGradient(cx, cy, 2, cx, cy, coreR);
+  coreGrad.addColorStop(0, '#ffffff');
+  coreGrad.addColorStop(0.35, '#00e5ff');
+  coreGrad.addColorStop(1, 'rgba(0, 229, 255, 0.15)');
+  ctx.fillStyle = coreGrad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, coreR, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function renderJarvis(cx, cy) {
+  const spinSpeed = emote === 'hype' && emoteTimer > 0 ? 2.5 : 0.6;
+  yaw += spinSpeed * 0.016;
+  const rad = 75;
+  const wavy = isRippling ? 0.35 : 0.08;
+
+  const cyw = Math.cos(yaw), syw = Math.sin(yaw);
+  const cp = Math.cos(pitch), sp = Math.sin(pitch);
+
+  ctx.strokeStyle = 'rgba(0, 229, 255, 0.2)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(cx, cy, rad + 18, 0, Math.PI * 2);
+  ctx.stroke();
+
+  for (let i = 0; i < SPHERE.length; i++) {
+    const p = SPHERE[i];
+    const band = Math.sin(p[1] * 7 - t * 8) * 0.5 + Math.sin(Math.atan2(p[2], p[0]) * 5 + t * 4) * 0.5;
+    const r = rad * (1 + wavy * band);
+
+    let x = p[0] * cyw + p[2] * syw;
+    let z = -p[0] * syw + p[2] * cyw;
+    let y = p[1] * cp - z * sp;
+    z = p[1] * sp + z * cp;
+
+    const px = cx + x * r;
+    const py = cy + y * r;
+
+    const alpha = Math.max(0.12, (z + 1) / 2);
+    const ptSize = Math.max(1, (z + 1.2) * 1.6);
+
+    ctx.fillStyle = z > 0.3 && isRippling ? `rgba(255, 255, 255, ${alpha})` : `rgba(0, 229, 255, ${alpha * 0.8})`;
+    ctx.fillRect(px, py, ptSize, ptSize);
+  }
+
+  const pulse = 1 + (isRippling ? Math.sin(t * 18) * 0.25 : Math.sin(t * 3) * 0.08);
+  const grad = ctx.createRadialGradient(cx, cy, 2, cx, cy, 20 * pulse);
+  grad.addColorStop(0, '#ffffff');
+  grad.addColorStop(0.3, '#00e5ff');
+  grad.addColorStop(1, 'rgba(0, 229, 255, 0)');
+
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 20 * pulse, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function renderClassic(cx, cy) {
+  const bob = Math.sin(t * 4) * 8;
+  const sq = 1 + Math.sin(t * 4) * 0.06;
+  const rx = 48 * sq;
+  const ry = 42 / sq;
+
+  ctx.fillStyle = '#0ea5e9';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + bob, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#38bdf8';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  const blink = Math.sin(t * 2) > 0.95 ? 0.2 : 1;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(cx - 18, cy + bob - 6, 9, 11 * blink);
+  ctx.fillRect(cx + 9, cy + bob - 6, 9, 11 * blink);
+
+  if (blink > 0.5) {
+    ctx.fillStyle = '#0284c7';
+    ctx.fillRect(cx - 14, cy + bob - 4, 4, 6);
+    ctx.fillRect(cx + 12, cy + bob - 4, 4, 6);
+  }
+}
+
+function renderHuman(cx, cy, type) {
+  const bob = Math.sin(t * 3) * 4;
+  const sway = Math.sin(t * 2.5) * 5;
+
+  const hairColor = type === 'anime' ? '#f43f5e' : '#fbbf24';
+  ctx.fillStyle = hairColor;
+  ctx.fillRect(cx - 26, cy + bob - 48, 52, 52);
+
+  if (type === 'anime') {
+    ctx.fillRect(cx - 40 + sway, cy + bob - 36, 14, 38);
+    ctx.fillRect(cx + 26 - sway, cy + bob - 36, 14, 38);
+  }
+
+  ctx.fillStyle = '#fef08a';
+  ctx.fillRect(cx - 20, cy + bob - 32, 40, 34);
+
+  const blink = Math.sin(t * 1.8) > 0.94 ? 0.2 : 1;
+  ctx.fillStyle = '#1e1b4b';
+  ctx.fillRect(cx - 13, cy + bob - 22, 6, 9 * blink);
+  ctx.fillRect(cx + 7, cy + bob - 22, 6, 9 * blink);
+
+  const mouthOpen = isRippling ? Math.abs(Math.sin(t * 12)) * 8 : 1;
+  ctx.fillStyle = '#e11d48';
+  ctx.fillRect(cx - 4, cy + bob - 8, 8, Math.max(1, mouthOpen));
+
+  ctx.fillStyle = 'rgba(0, 229, 255, 0.4)';
+  ctx.fillRect(cx - 34, cy + bob + 8, 68, 24);
+}
+
+render();
+</script>
+
+</body>
+</html>
