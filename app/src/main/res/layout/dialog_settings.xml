@@ -1,81 +1,150 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:background="@color/card_dark"
-    android:padding="20dp">
+    android:background="@color/card_dark">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Roamies Settings"
-        android:textColor="@color/accent_cyan"
-        android:textSize="18sp"
-        android:textStyle="bold"
-        android:layout_marginBottom="16dp" />
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="AI Provider"
-        android:textColor="@color/text_primary"
-        android:textSize="13sp"
-        android:layout_marginBottom="4dp" />
-
-    <Spinner
-        android:id="@+id/dialogSpinnerProvider"
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="44dp"
-        android:background="@color/bg_dark"
-        android:layout_marginBottom="12dp" />
-
-    <TextView
-        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Model Name"
-        android:textColor="@color/text_primary"
-        android:textSize="13sp"
-        android:layout_marginBottom="4dp" />
+        android:orientation="vertical"
+        android:padding="20dp">
 
-    <EditText
-        android:id="@+id/dialogEtModel"
-        android:layout_width="match_parent"
-        android:layout_height="44dp"
-        android:background="@color/bg_dark"
-        android:textColor="@color/text_primary"
-        android:hint="gemini-1.5-flash"
-        android:textColorHint="@color/text_secondary"
-        android:paddingHorizontal="12dp"
-        android:layout_marginBottom="12dp" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Companion AI Configuration"
+            android:textColor="@color/accent_cyan"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="16dp" />
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="API Key (Google Gemini / OpenAI)"
-        android:textColor="@color/text_primary"
-        android:textSize="13sp"
-        android:layout_marginBottom="4dp" />
+        <!-- AI Provider Selection -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="AI Provider"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp" />
 
-    <EditText
-        android:id="@+id/dialogEtApiKey"
-        android:layout_width="match_parent"
-        android:layout_height="44dp"
-        android:background="@color/bg_dark"
-        android:textColor="@color/text_primary"
-        android:inputType="textPassword"
-        android:hint="Paste your API key here"
-        android:textColorHint="@color/text_secondary"
-        android:paddingHorizontal="12dp"
-        android:layout_marginBottom="20dp" />
+        <Spinner
+            android:id="@+id/dialogSpinnerProvider"
+            android:layout_width="match_parent"
+            android:layout_height="46dp"
+            android:background="@color/bg_dark"
+            android:paddingHorizontal="8dp"
+            android:layout_marginBottom="12dp" />
 
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/dialogBtnSave"
-        android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:text="Save &amp; Connect"
-        android:textColor="@color/bg_dark"
-        app:backgroundTint="@color/accent_cyan"
-        app:cornerRadius="8dp" />
-</LinearLayout>
+        <!-- Curated Model Preset Selection -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Curated Model Preset"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp" />
+
+        <Spinner
+            android:id="@+id/dialogSpinnerModelPreset"
+            android:layout_width="match_parent"
+            android:layout_height="46dp"
+            android:background="@color/bg_dark"
+            android:paddingHorizontal="8dp"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Custom Model Name (Editable) -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Model Identifier (or Custom Model)"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:layout_marginBottom="4dp" />
+
+        <EditText
+            android:id="@+id/dialogEtModel"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:background="@color/bg_dark"
+            android:textColor="@color/text_primary"
+            android:hint="gemini-1.5-flash"
+            android:textColorHint="@color/text_secondary"
+            android:paddingHorizontal="12dp"
+            android:singleLine="true"
+            android:layout_marginBottom="12dp" />
+
+        <!-- API Endpoint URL -->
+        <TextView
+            android:id="@+id/dialogTvEndpointLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Endpoint URL (for Local LLMs / Custom)"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:layout_marginBottom="4dp" />
+
+        <EditText
+            android:id="@+id/dialogEtEndpoint"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:background="@color/bg_dark"
+            android:textColor="@color/text_primary"
+            android:hint="https://api.openai.com/v1/chat/completions"
+            android:textColorHint="@color/text_secondary"
+            android:paddingHorizontal="12dp"
+            android:singleLine="true"
+            android:layout_marginBottom="12dp" />
+
+        <!-- API Key Input -->
+        <TextView
+            android:id="@+id/dialogTvApiKeyLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="API Key (Auto-detects on paste)"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp" />
+
+        <EditText
+            android:id="@+id/dialogEtApiKey"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:background="@color/bg_dark"
+            android:textColor="@color/text_primary"
+            android:inputType="textPassword"
+            android:hint="Paste API Key here (or leave blank for Local LLM)"
+            android:textColorHint="@color/text_secondary"
+            android:paddingHorizontal="12dp"
+            android:singleLine="true"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Test Connection Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/dialogBtnTestConnection"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:text="⚡ Test Connection"
+            android:textColor="@color/accent_cyan"
+            app:strokeColor="@color/accent_cyan"
+            android:layout_marginBottom="8dp" />
+
+        <!-- Test Status Display -->
+        <TextView
+            android:id="@+id/dialogTvTestStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textColor="@color/accent_cyan"
+            android:textSize="12sp"
+            android:gravity="center"
+            android:visibility="gone"
+            android:layout_marginBottom="12dp" />
+
+    </LinearLayout>
+</ScrollView>

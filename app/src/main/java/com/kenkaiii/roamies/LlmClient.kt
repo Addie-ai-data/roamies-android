@@ -32,8 +32,8 @@ class LlmClient(
     private val memoryStore: SidekickMemoryStore
 ) {
     private val http = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
         .build()
 
     suspend fun executeTurn(userPrompt: String): LlmTurnResult = withContext(Dispatchers.IO) {
@@ -74,13 +74,32 @@ class LlmClient(
             }
         """.trimIndent()
 
-        val rawResponse = when (auth.provider.lowercase()) {
-            "gemini" -> callGemini(systemPrompt, userPrompt)
-            "anthropic" -> callAnthropic(systemPrompt, userPrompt)
+        val rawResponse = dispatchTurn(auth.provider.lowercase(), systemPrompt, userPrompt)
+        parseTurnResponse(rawResponse)
+    }
+
+    private fun dispatchTurn(provider: String, systemPrompt: String, userPrompt: String): String {
+        return when {
+            provider.contains("gemini") -> callGemini(systemPrompt, userPrompt)
+            provider.contains("openrouter") -> callOpenRouter(systemPrompt, userPrompt)
+            provider.contains("groq") -> callGroq(systemPrompt, userPrompt)
+            provider.contains("anthropic") || provider.contains("claude") -> callAnthropic(systemPrompt, userPrompt)
+            provider.contains("local") || provider.contains("ollama") -> callLocalLlm(systemPrompt, userPrompt)
             else -> callOpenAiCompatible(systemPrompt, userPrompt)
         }
+    }
 
-        parseTurnResponse(rawResponse)
+    suspend fun testConnection(): Pair<Boolean, String> = withContext(Dispatchers.IO) {
+        try {
+            val reply = dispatchTurn(auth.provider.lowercase(), "Reply strictly with: Connection verified.", "Ping")
+            if (reply.contains("error", ignoreCase = true) || reply.contains("404") || reply.contains("401") || reply.contains("400")) {
+                Pair(false, reply)
+            } else {
+                Pair(true, "✅ Connected successfully to ${auth.model}!")
+            }
+        } catch (e: Exception) {
+            Pair(false, "❌ Connection failed: ${e.localizedMessage ?: "Unknown error"}")
+        }
     }
 
     private fun parseTurnResponse(raw: String): LlmTurnResult {
@@ -115,7 +134,7 @@ class LlmClient(
                 }
                 LlmTurnResult(spokenReply = spoken, toolCalls = toolList)
             } else {
-                LlmTurnResult(spokenReply = raw.trim(), toolCalls = emptyList())
+                LlmTurnResult(spokenReply = raw.trim().ifBlank { "At your service, sir." }, toolCalls = emptyList())
             }
         } catch (e: Exception) {
             LlmTurnResult(
@@ -125,13 +144,13 @@ class LlmClient(
         }
     }
 
+    // ── 1. Google Gemini Provider ──
     private fun callGemini(systemPrompt: String, userPrompt: String): String {
         val apiKey = auth.apiKey.trim()
         if (apiKey.isBlank()) {
-            return """{"spoken_reply": "Please paste your Gemini API key in Settings (gear icon at top right), sir.", "tool_calls": []}"""
+            return """{"spoken_reply": "Please paste your Gemini API key in Settings, sir.", "tool_calls": []}"""
         }
 
-        // Sanitize model name - remove prefixes and invalid versions like 2.5
         var model = auth.model.trim().removePrefix("models/").ifBlank { "gemini-1.5-flash" }
         if (model.contains("2.5") || model == "gemini-flash") {
             model = "gemini-1.5-flash"
@@ -149,17 +168,13 @@ class LlmClient(
             })
             put("generationConfig", JSONObject().apply {
                 put("temperature", 0.7)
-                put("responseMimeType", "application/json")
             })
         }
 
         val requestBody = bodyJson.toString().toRequestBody("application/json".toMediaType())
         val url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey"
 
-        val request = Request.Builder()
-            .url(url)
-            .post(requestBody)
-            .build()
+        val request = Request.Builder().url(url).post(requestBody).build()
 
         try {
             http.newCall(request).execute().use { resp ->
@@ -191,10 +206,8 @@ class LlmClient(
                     }
                 }
 
-                // Extract specific error message from Google's response
                 val errorMessage = try {
-                    val err = JSONObject(body).optJSONObject("error")
-                    err?.optString("message") ?: "HTTP ${resp.code}"
+                    JSONObject(body).optJSONObject("error")?.optString("message") ?: "HTTP ${resp.code}"
                 } catch (e: Exception) {
                     "HTTP ${resp.code}"
                 }
@@ -202,10 +215,139 @@ class LlmClient(
                 return """{"spoken_reply": "Gemini error (${resp.code}): $errorMessage", "tool_calls": []}"""
             }
         } catch (e: Exception) {
-            return """{"spoken_reply": "Network connection error: ${e.localizedMessage ?: "Unable to reach Gemini"}", "tool_calls": []}"""
+            return """{"spoken_reply": "Network error: ${e.localizedMessage ?: "Unable to reach Gemini"}", "tool_calls": []}"""
         }
     }
 
+    // ── 2. OpenRouter Provider (200+ models, free models included) ──
+    private fun callOpenRouter(systemPrompt: String, userPrompt: String): String {
+        val apiKey = auth.apiKey.trim()
+        val model = auth.model.ifBlank { "google/gemini-2.0-flash-exp:free" }
+        val url = "https://openrouter.ai/api/v1/chat/completions"
+
+        val bodyJson = JSONObject().apply {
+            put("model", model)
+            put("messages", JSONArray().apply {
+                put(JSONObject().apply {
+                    put("role", "system")
+                    put("content", systemPrompt)
+                })
+                put(JSONObject().apply {
+                    put("role", "user")
+                    put("content", userPrompt)
+                })
+            })
+        }
+
+        val request = Request.Builder()
+            .url(url)
+            .header("Authorization", "Bearer $apiKey")
+            .header("HTTP-Referer", "https://github.com/Addie-ai-data/roamies-android")
+            .header("X-Title", "Roamies J.A.R.V.I.S.")
+            .post(bodyJson.toString().toRequestBody("application/json".toMediaType()))
+            .build()
+
+        try {
+            http.newCall(request).execute().use { resp ->
+                val body = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) {
+                    val errMsg = try { JSONObject(body).optJSONObject("error")?.optString("message") ?: "HTTP ${resp.code}" } catch (e: Exception) { "HTTP ${resp.code}" }
+                    return """{"spoken_reply": "OpenRouter error: $errMsg", "tool_calls": []}"""
+                }
+                val root = JSONObject(body)
+                val choices = root.optJSONArray("choices") ?: return "{}"
+                return choices.optJSONObject(0)?.optJSONObject("message")?.optString("content").orEmpty()
+            }
+        } catch (e: Exception) {
+            return """{"spoken_reply": "OpenRouter network error: ${e.localizedMessage}", "tool_calls": []}"""
+        }
+    }
+
+    // ── 3. Groq Provider (Ultra-Fast 300+ tok/s) ──
+    private fun callGroq(systemPrompt: String, userPrompt: String): String {
+        val apiKey = auth.apiKey.trim()
+        val model = auth.model.ifBlank { "llama-3.3-70b-versatile" }
+        val url = "https://api.groq.com/openai/v1/chat/completions"
+
+        val bodyJson = JSONObject().apply {
+            put("model", model)
+            put("messages", JSONArray().apply {
+                put(JSONObject().apply {
+                    put("role", "system")
+                    put("content", systemPrompt)
+                })
+                put(JSONObject().apply {
+                    put("role", "user")
+                    put("content", userPrompt)
+                })
+            })
+        }
+
+        val request = Request.Builder()
+            .url(url)
+            .header("Authorization", "Bearer $apiKey")
+            .post(bodyJson.toString().toRequestBody("application/json".toMediaType()))
+            .build()
+
+        try {
+            http.newCall(request).execute().use { resp ->
+                val body = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) {
+                    val errMsg = try { JSONObject(body).optJSONObject("error")?.optString("message") ?: "HTTP ${resp.code}" } catch (e: Exception) { "HTTP ${resp.code}" }
+                    return """{"spoken_reply": "Groq error: $errMsg", "tool_calls": []}"""
+                }
+                val root = JSONObject(body)
+                val choices = root.optJSONArray("choices") ?: return "{}"
+                return choices.optJSONObject(0)?.optJSONObject("message")?.optString("content").orEmpty()
+            }
+        } catch (e: Exception) {
+            return """{"spoken_reply": "Groq network error: ${e.localizedMessage}", "tool_calls": []}"""
+        }
+    }
+
+    // ── 4. Local LLM / Ollama (Mobile / Termux / LAN) ──
+    private fun callLocalLlm(systemPrompt: String, userPrompt: String): String {
+        val url = auth.endpoint.ifBlank { "http://127.0.0.1:11434/v1/chat/completions" }
+        val model = auth.model.ifBlank { "llama3.2" }
+
+        val bodyJson = JSONObject().apply {
+            put("model", model)
+            put("messages", JSONArray().apply {
+                put(JSONObject().apply {
+                    put("role", "system")
+                    put("content", systemPrompt)
+                })
+                put(JSONObject().apply {
+                    put("role", "user")
+                    put("content", userPrompt)
+                })
+            })
+        }
+
+        val reqBuilder = Request.Builder()
+            .url(url)
+            .post(bodyJson.toString().toRequestBody("application/json".toMediaType()))
+
+        if (auth.apiKey.isNotBlank()) {
+            reqBuilder.header("Authorization", "Bearer ${auth.apiKey.trim()}")
+        }
+
+        try {
+            http.newCall(reqBuilder.build()).execute().use { resp ->
+                val body = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) {
+                    return """{"spoken_reply": "Local LLM HTTP error ${resp.code}. Ensure your local server is running at $url", "tool_calls": []}"""
+                }
+                val root = JSONObject(body)
+                val choices = root.optJSONArray("choices") ?: return "{}"
+                return choices.optJSONObject(0)?.optJSONObject("message")?.optString("content").orEmpty()
+            }
+        } catch (e: Exception) {
+            return """{"spoken_reply": "Could not connect to Local LLM at $url. Ensure Ollama/LocalAI is running.", "tool_calls": []}"""
+        }
+    }
+
+    // ── 5. OpenAI / Custom Compatible ──
     private fun callOpenAiCompatible(systemPrompt: String, userPrompt: String): String {
         val apiKey = auth.apiKey.trim()
         val url = if (auth.endpoint.isNotBlank()) auth.endpoint else "https://api.openai.com/v1/chat/completions"
@@ -231,18 +373,22 @@ class LlmClient(
             .post(bodyJson.toString().toRequestBody("application/json".toMediaType()))
             .build()
 
-        http.newCall(request).execute().use { resp ->
-            val body = resp.body?.string().orEmpty()
-            if (!resp.isSuccessful) {
-                return """{"spoken_reply": "Service error: ${resp.code}", "tool_calls": []}"""
+        try {
+            http.newCall(request).execute().use { resp ->
+                val body = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) {
+                    return """{"spoken_reply": "API service error: ${resp.code}", "tool_calls": []}"""
+                }
+                val root = JSONObject(body)
+                val choices = root.optJSONArray("choices") ?: return "{}"
+                return choices.optJSONObject(0)?.optJSONObject("message")?.optString("content").orEmpty()
             }
-            val root = JSONObject(body)
-            val choices = root.optJSONArray("choices") ?: return "{}"
-            val msg = choices.optJSONObject(0)?.optJSONObject("message") ?: return "{}"
-            return msg.optString("content").orEmpty()
+        } catch (e: Exception) {
+            return """{"spoken_reply": "Network connection error: ${e.localizedMessage}", "tool_calls": []}"""
         }
     }
 
+    // ── 6. Anthropic Claude ──
     private fun callAnthropic(systemPrompt: String, userPrompt: String): String {
         val apiKey = auth.apiKey.trim()
         val url = "https://api.anthropic.com/v1/messages"
@@ -267,14 +413,18 @@ class LlmClient(
             .post(bodyJson.toString().toRequestBody("application/json".toMediaType()))
             .build()
 
-        http.newCall(request).execute().use { resp ->
-            val body = resp.body?.string().orEmpty()
-            if (!resp.isSuccessful) {
-                return """{"spoken_reply": "Anthropic error: ${resp.code}", "tool_calls": []}"""
+        try {
+            http.newCall(request).execute().use { resp ->
+                val body = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) {
+                    return """{"spoken_reply": "Anthropic error: ${resp.code}", "tool_calls": []}"""
+                }
+                val root = JSONObject(body)
+                val contents = root.optJSONArray("content") ?: return "{}"
+                return contents.optJSONObject(0)?.optString("text").orEmpty()
             }
-            val root = JSONObject(body)
-            val contents = root.optJSONArray("content") ?: return "{}"
-            return contents.optJSONObject(0)?.optString("text").orEmpty()
+        } catch (e: Exception) {
+            return """{"spoken_reply": "Anthropic network error: ${e.localizedMessage}", "tool_calls": []}"""
         }
     }
 }

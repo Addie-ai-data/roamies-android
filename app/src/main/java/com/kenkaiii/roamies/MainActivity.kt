@@ -17,12 +17,15 @@ import android.os.VibratorManager
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.ImageButton
@@ -67,7 +70,7 @@ class MainActivity : AppCompatActivity() {
 
     private var speechRecognizer: SpeechRecognizer? = null
 
-    // System voice recognition fallback launcher (guaranteed to work across all Android versions/OEM skins)
+    // System voice recognition fallback launcher (guaranteed across all Android skins)
     private val voiceLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         setMicActive(false)
         if (result.resultCode == Activity.RESULT_OK && result.data != null) {
@@ -101,10 +104,10 @@ class MainActivity : AppCompatActivity() {
         // Welcome utterance on startup
         mainHandler.postDelayed({
             activityScope.launch {
-                if (auth.apiKey.isBlank()) {
-                    ttsClient.speak("J.A.R.V.I.S. online. Tap the settings gear icon at the top right to paste your Gemini API key, sir!")
+                if (auth.apiKey.isBlank() && !auth.provider.contains("local")) {
+                    ttsClient.speak("J.A.R.V.I.S. online. Tap the settings gear icon at the top right to select your AI model, sir!")
                 } else {
-                    ttsClient.speak("J.A.R.V.I.S. online. Arc Reactor calibrated. How may I assist you, sir?")
+                    ttsClient.speak("J.A.R.V.I.S. online. Arc Reactor calibrated and ${auth.model} standing by. How may I assist you, sir?")
                 }
             }
         }, 1500L)
@@ -365,10 +368,7 @@ class MainActivity : AppCompatActivity() {
                     override fun onError(error: Int) {
                         setMicActive(false)
                         evalJs("RoamieAndroid.showHandsBadge(null); RoamieAndroid.setSpeechRipple(false, 0);")
-                        // If in-process recognition encounters an error, fallback to system voice popup
-                        if (error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
-                            // User remained silent, no need to fallback
-                        } else {
+                        if (error != SpeechRecognizer.ERROR_NO_MATCH && error != SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
                             launchSystemVoiceFallback()
                         }
                     }
@@ -434,33 +434,156 @@ class MainActivity : AppCompatActivity() {
     private fun showSettingsDialog() {
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_settings, null)
         val spinnerProv: Spinner = dialogView.findViewById(R.id.dialogSpinnerProvider)
+        val spinnerModelPreset: Spinner = dialogView.findViewById(R.id.dialogSpinnerModelPreset)
         val etModel: EditText = dialogView.findViewById(R.id.dialogEtModel)
+        val etEndpoint: EditText = dialogView.findViewById(R.id.dialogEtEndpoint)
         val etKey: EditText = dialogView.findViewById(R.id.dialogEtApiKey)
+        val btnTestConn: MaterialButton = dialogView.findViewById(R.id.dialogBtnTestConnection)
+        val tvTestStatus: TextView = dialogView.findViewById(R.id.dialogTvTestStatus)
 
-        val providers = listOf("Gemini", "OpenAI", "Anthropic")
+        val providers = listOf(
+            "Google Gemini (Free Tier)",
+            "OpenRouter (200+ models, Free tier)",
+            "Groq (Ultra-Fast 300+ tok/s)",
+            "OpenAI (ChatGPT)",
+            "Anthropic Claude",
+            "Local LLM / Ollama (Mobile / Termux / LAN)",
+            "Custom / OpenCode"
+        )
+        val providerKeys = listOf("gemini", "openrouter", "groq", "openai", "anthropic", "local", "custom")
+
+        val modelPresets = mapOf(
+            "gemini" to listOf("gemini-1.5-flash", "gemini-2.0-flash-exp", "gemini-1.5-flash-8b", "gemini-1.5-pro", "Custom model..."),
+            "openrouter" to listOf("google/gemini-2.0-flash-exp:free", "meta-llama/llama-3.3-70b-instruct:free", "deepseek/deepseek-chat", "openai/gpt-4o-mini", "anthropic/claude-3.5-sonnet", "Custom model..."),
+            "groq" to listOf("llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768", "Custom model..."),
+            "openai" to listOf("gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo", "Custom model..."),
+            "anthropic" to listOf("claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022", "Custom model..."),
+            "local" to listOf("llama3.2", "qwen2.5", "mistral", "phi3", "gemma2", "Custom model..."),
+            "custom" to listOf("Custom model...")
+        )
+
+        val defaultEndpoints = mapOf(
+            "gemini" to "",
+            "openrouter" to "https://openrouter.ai/api/v1/chat/completions",
+            "groq" to "https://api.groq.com/openai/v1/chat/completions",
+            "openai" to "https://api.openai.com/v1/chat/completions",
+            "anthropic" to "https://api.anthropic.com/v1/messages",
+            "local" to "http://127.0.0.1:11434/v1/chat/completions",
+            "custom" to "http://127.0.0.1:8000/v1/chat/completions"
+        )
+
         spinnerProv.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, providers)
-        val provIndex = providers.indexOfFirst { it.equals(auth.provider, ignoreCase = true) }.coerceAtLeast(0)
-        spinnerProv.setSelection(provIndex)
+        val currentProvKey = auth.provider.lowercase()
+        val initProvIdx = providerKeys.indexOfFirst { currentProvKey.contains(it) }.coerceAtLeast(0)
+        spinnerProv.setSelection(initProvIdx)
 
-        // Ensure clean model name is presented
-        var cleanModel = auth.model.trim().removePrefix("models/")
-        if (cleanModel.contains("2.5") || cleanModel.isBlank()) {
-            cleanModel = "gemini-1.5-flash"
+        fun updateModelPresets(provKey: String) {
+            val presets = modelPresets[provKey] ?: listOf("Custom model...")
+            spinnerModelPreset.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, presets)
+            val currentModel = auth.model.trim()
+            val presetIdx = presets.indexOf(currentModel)
+            if (presetIdx >= 0) {
+                spinnerModelPreset.setSelection(presetIdx)
+            } else {
+                spinnerModelPreset.setSelection(presets.size - 1)
+            }
+
+            // Update endpoint display
+            if (auth.endpoint.isNotBlank()) {
+                etEndpoint.setText(auth.endpoint)
+            } else {
+                etEndpoint.setText(defaultEndpoints[provKey].orEmpty())
+            }
+
+            // Local LLM does not strictly require an API key
+            if (provKey == "local") {
+                etKey.hint = "Not required for local models"
+            } else {
+                etKey.hint = "Paste your API key here"
+            }
         }
+
+        updateModelPresets(providerKeys[initProvIdx])
+
+        spinnerProv.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                val selectedKey = providerKeys[position]
+                updateModelPresets(selectedKey)
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+
+        spinnerModelPreset.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                val selected = spinnerModelPreset.selectedItem.toString()
+                if (selected != "Custom model...") {
+                    etModel.setText(selected)
+                }
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+
+        var cleanModel = auth.model.trim().removePrefix("models/")
+        if (cleanModel.contains("2.5") || cleanModel.isBlank()) cleanModel = "gemini-1.5-flash"
         etModel.setText(cleanModel)
         etKey.setText(auth.apiKey)
+        if (auth.endpoint.isNotBlank()) etEndpoint.setText(auth.endpoint)
+
+        // Smart API key auto-detection on paste
+        etKey.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                val key = s?.toString()?.trim().orEmpty()
+                if (key.startsWith("AIzaSy")) {
+                    spinnerProv.setSelection(providerKeys.indexOf("gemini"))
+                } else if (key.startsWith("sk-or-")) {
+                    spinnerProv.setSelection(providerKeys.indexOf("openrouter"))
+                } else if (key.startsWith("gsk_")) {
+                    spinnerProv.setSelection(providerKeys.indexOf("groq"))
+                } else if (key.startsWith("sk-ant-")) {
+                    spinnerProv.setSelection(providerKeys.indexOf("anthropic"))
+                } else if (key.startsWith("sk-") && !key.startsWith("sk-or-") && !key.startsWith("sk-ant-")) {
+                    spinnerProv.setSelection(providerKeys.indexOf("openai"))
+                }
+            }
+        })
+
+        // Test Connection button
+        btnTestConn.setOnClickListener {
+            val selectedKey = providerKeys[spinnerProv.selectedItemPosition]
+            auth.provider = selectedKey
+            var m = etModel.text.toString().trim().removePrefix("models/")
+            if (m.isBlank()) m = if (selectedKey == "gemini") "gemini-1.5-flash" else "gpt-4o-mini"
+            auth.model = m
+            auth.apiKey = etKey.text.toString().trim()
+            auth.endpoint = etEndpoint.text.toString().trim()
+
+            tvTestStatus.visibility = View.VISIBLE
+            tvTestStatus.setTextColor(ContextCompat.getColor(this, R.color.accent_cyan))
+            tvTestStatus.text = "⚡ Testing connection to $m..."
+
+            activityScope.launch {
+                val (ok, msg) = llmClient.testConnection()
+                tvTestStatus.text = msg
+                tvTestStatus.setTextColor(if (ok) Color.parseColor("#4ade80") else Color.parseColor("#f87171"))
+            }
+        }
 
         AlertDialog.Builder(this)
             .setTitle("Companion Intelligence Settings")
             .setView(dialogView)
             .setPositiveButton("Save") { _, _ ->
-                auth.provider = spinnerProv.selectedItem.toString().lowercase()
+                val selectedKey = providerKeys[spinnerProv.selectedItemPosition]
+                auth.provider = selectedKey
                 var modelInput = etModel.text.toString().trim().removePrefix("models/")
                 if (modelInput.contains("2.5") || modelInput.isBlank()) {
-                    modelInput = "gemini-1.5-flash"
+                    modelInput = if (selectedKey == "gemini") "gemini-1.5-flash" else "gpt-4o-mini"
                 }
                 auth.model = modelInput
                 auth.apiKey = etKey.text.toString().trim()
+                auth.endpoint = etEndpoint.text.toString().trim()
+
                 Toast.makeText(this, "Settings saved! Using $modelInput", Toast.LENGTH_SHORT).show()
                 activityScope.launch {
                     ttsClient.speak("Settings updated, sir. Arc Reactor and $modelInput are calibrated.")
