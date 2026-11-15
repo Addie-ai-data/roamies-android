@@ -63,5 +63,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cp app/build/outputs/apk/release/app-release.apk roamies-v0.2.2-android16.apk
-          gh release upload v0.2.0 roamies-v0.2.2-android16.apk --clobber || true
+          cp app/build/outputs/apk/release/app-release.apk roamies-v0.2.3-safe.apk
+          gh release upload v0.2.0 roamies-v0.2.3-safe.apk --clobber || true

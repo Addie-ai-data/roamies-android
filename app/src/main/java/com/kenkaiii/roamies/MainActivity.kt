@@ -162,9 +162,8 @@ class MainActivity : AppCompatActivity() {
         btnPermMic.text = if (hasMic) "Granted" else "Grant"
         btnPermMic.isEnabled = !hasMic
 
-        val hasHands = RoamieHandsAccessibilityService.instance != null
-        btnPermAccessibility.text = if (hasHands) "Active" else "Enable"
-        btnPermAccessibility.isEnabled = !hasHands
+        btnPermAccessibility.text = "Safe Mode"
+        btnPermAccessibility.isEnabled = false
     }
 
     private fun updateServiceStatus() {
