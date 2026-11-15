@@ -1,6 +1,13 @@
 # Roamies for Android (1:1 Native Android Port)
 
+<p align="center">
+  <a href="https://github.com/Addie-ai-data/roamies-android/releases/latest"><img src="https://img.shields.io/github/v/release/Addie-ai-data/roamies-android?style=for-the-badge&label=Download%20APK&color=00F5D4" alt="Download APK"></a>
+  <a href="https://github.com/Addie-ai-data/roamies-android/releases"><img src="https://img.shields.io/badge/Platform-Android%208.0%2B-blue?style=for-the-badge" alt="Android Compatible"></a>
+</p>
+
 An identical, 1:1 port of [KenKaiii/Roamies](https://github.com/KenKaiii/Roamies) built natively for Android devices.
+
+> 📲 **1-Click Download**: [**Download roamies-v0.2.0.apk**](https://github.com/Addie-ai-data/roamies-android/releases/download/v0.2.0/roamies-v0.2.0.apk)
 
 ---
 
