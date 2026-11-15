@@ -43,6 +43,14 @@ class AuthStorage(context: Context) {
         get() = prefs.getString("modelId", "gemini-1.5-flash") ?: "gemini-1.5-flash"
         set(value) = prefs.edit().putString("modelId", value).apply()
 
+    var model: String
+        get() = modelId
+        set(value) { modelId = value }
+
+    var endpoint: String
+        get() = prefs.getString("endpoint", "") ?: ""
+        set(value) = prefs.edit().putString("endpoint", value).apply()
+
     var apiKey: String
         get() = prefs.getString("apiKey", "") ?: ""
         set(value) = prefs.edit().putString("apiKey", value).apply()
