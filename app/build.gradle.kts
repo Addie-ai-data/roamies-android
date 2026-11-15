@@ -5,14 +5,14 @@ plugins {
 
 android {
     namespace = "com.kenkaiii.roamies"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.kenkaiii.roamies"
+        applicationId = "com.addie.roamies"
         minSdk = 26
-        targetSdk = 34
-        versionCode = 1
-        versionName = "0.2.0"
+        targetSdk = 35
+        versionCode = 2
+        versionName = "0.2.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
