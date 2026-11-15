@@ -80,10 +80,12 @@ class MainActivity : AppCompatActivity() {
 
         // Welcome utterance if first launch
         mainHandler.postDelayed({
-            if (auth.apiKey.isBlank()) {
-                ttsClient.speak("Hello! I am ${auth.character.displayName}. Tap the settings icon at the top right to paste your Gemini API key so we can chat!")
-            } else {
-                ttsClient.speak("At your service.")
+            activityScope.launch {
+                if (auth.apiKey.isBlank()) {
+                    ttsClient.speak("Hello! I am ${auth.character.displayName}. Tap the settings icon at the top right to paste your Gemini API key so we can chat!")
+                } else {
+                    ttsClient.speak("At your service.")
+                }
             }
         }, 1500L)
     }
@@ -311,7 +313,9 @@ class MainActivity : AppCompatActivity() {
             auth.apiKey = etApiKey.text.toString().trim()
             dialog.dismiss()
             Toast.makeText(this, "API Key Saved! Say hello to your Roamie.", Toast.LENGTH_SHORT).show()
-            ttsClient.speak("Settings saved! What would you like to explore today?")
+            activityScope.launch {
+                ttsClient.speak("Settings saved! What would you like to explore today?")
+            }
         }
 
         dialog.show()
