@@ -40,8 +40,21 @@ class AuthStorage(context: Context) {
         set(value) = prefs.edit().putString("provider", value).apply()
 
     var modelId: String
-        get() = prefs.getString("modelId", "gemini-1.5-flash") ?: "gemini-1.5-flash"
-        set(value) = prefs.edit().putString("modelId", value).apply()
+        get() {
+            val stored = prefs.getString("modelId", "gemini-1.5-flash") ?: "gemini-1.5-flash"
+            val cleaned = stored.trim().removePrefix("models/")
+            if (cleaned.contains("2.5") || cleaned.isBlank()) {
+                return "gemini-1.5-flash"
+            }
+            return cleaned
+        }
+        set(value) {
+            var cleaned = value.trim().removePrefix("models/")
+            if (cleaned.contains("2.5") || cleaned.isBlank()) {
+                cleaned = "gemini-1.5-flash"
+            }
+            prefs.edit().putString("modelId", cleaned).apply()
+        }
 
     var model: String
         get() = modelId
@@ -52,8 +65,8 @@ class AuthStorage(context: Context) {
         set(value) = prefs.edit().putString("endpoint", value).apply()
 
     var apiKey: String
-        get() = prefs.getString("apiKey", "") ?: ""
-        set(value) = prefs.edit().putString("apiKey", value).apply()
+        get() = prefs.getString("apiKey", "")?.trim() ?: ""
+        set(value) = prefs.edit().putString("apiKey", value.trim()).apply()
 
     var fishAudioKey: String
         get() = prefs.getString("fishAudioKey", "") ?: ""

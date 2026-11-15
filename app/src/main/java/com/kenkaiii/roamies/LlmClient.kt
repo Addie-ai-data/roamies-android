@@ -128,10 +128,15 @@ class LlmClient(
     private fun callGemini(systemPrompt: String, userPrompt: String): String {
         val apiKey = auth.apiKey.trim()
         if (apiKey.isBlank()) {
-            return """{"spoken_reply": "Please configure your Gemini API key in Settings, sir.", "tool_calls": []}"""
+            return """{"spoken_reply": "Please paste your Gemini API key in Settings (gear icon at top right), sir.", "tool_calls": []}"""
         }
-        val model = auth.model.ifBlank { "gemini-1.5-flash" }
-        val url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey"
+
+        // Sanitize model name - remove prefixes and invalid versions like 2.5
+        var model = auth.model.trim().removePrefix("models/").ifBlank { "gemini-1.5-flash" }
+        if (model.contains("2.5") || model == "gemini-flash") {
+            model = "gemini-1.5-flash"
+            auth.model = model
+        }
 
         val bodyJson = JSONObject().apply {
             put("contents", JSONArray().apply {
@@ -148,22 +153,56 @@ class LlmClient(
             })
         }
 
+        val requestBody = bodyJson.toString().toRequestBody("application/json".toMediaType())
+        val url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey"
+
         val request = Request.Builder()
             .url(url)
-            .post(bodyJson.toString().toRequestBody("application/json".toMediaType()))
+            .post(requestBody)
             .build()
 
-        http.newCall(request).execute().use { resp ->
-            val body = resp.body?.string().orEmpty()
-            if (!resp.isSuccessful) {
-                return """{"spoken_reply": "API communication error: ${resp.code}", "tool_calls": []}"""
+        try {
+            http.newCall(request).execute().use { resp ->
+                val body = resp.body?.string().orEmpty()
+                if (resp.isSuccessful) {
+                    val root = JSONObject(body)
+                    val candidates = root.optJSONArray("candidates") ?: return "{}"
+                    val first = candidates.optJSONObject(0) ?: return "{}"
+                    val content = first.optJSONObject("content") ?: return "{}"
+                    val parts = content.optJSONArray("parts") ?: return "{}"
+                    return parts.optJSONObject(0)?.optString("text").orEmpty()
+                }
+
+                // If 404 (Model Not Found), auto-fallback to gemini-1.5-flash
+                if (resp.code == 404 && model != "gemini-1.5-flash") {
+                    auth.model = "gemini-1.5-flash"
+                    val fallbackUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey"
+                    val fallbackReq = Request.Builder().url(fallbackUrl).post(requestBody).build()
+                    http.newCall(fallbackReq).execute().use { fbResp ->
+                        val fbBody = fbResp.body?.string().orEmpty()
+                        if (fbResp.isSuccessful) {
+                            val root = JSONObject(fbBody)
+                            val candidates = root.optJSONArray("candidates") ?: return "{}"
+                            val first = candidates.optJSONObject(0) ?: return "{}"
+                            val content = first.optJSONObject("content") ?: return "{}"
+                            val parts = content.optJSONArray("parts") ?: return "{}"
+                            return parts.optJSONObject(0)?.optString("text").orEmpty()
+                        }
+                    }
+                }
+
+                // Extract specific error message from Google's response
+                val errorMessage = try {
+                    val err = JSONObject(body).optJSONObject("error")
+                    err?.optString("message") ?: "HTTP ${resp.code}"
+                } catch (e: Exception) {
+                    "HTTP ${resp.code}"
+                }
+
+                return """{"spoken_reply": "Gemini error (${resp.code}): $errorMessage", "tool_calls": []}"""
             }
-            val root = JSONObject(body)
-            val candidates = root.optJSONArray("candidates") ?: return "{}"
-            val first = candidates.optJSONObject(0) ?: return "{}"
-            val content = first.optJSONObject("content") ?: return "{}"
-            val parts = content.optJSONArray("parts") ?: return "{}"
-            return parts.optJSONObject(0)?.optString("text").orEmpty()
+        } catch (e: Exception) {
+            return """{"spoken_reply": "Network connection error: ${e.localizedMessage ?: "Unable to reach Gemini"}", "tool_calls": []}"""
         }
     }
 

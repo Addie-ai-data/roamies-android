@@ -2,6 +2,7 @@ package com.kenkaiii.roamies
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -28,6 +29,7 @@ import android.widget.ImageButton
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -65,6 +67,19 @@ class MainActivity : AppCompatActivity() {
 
     private var speechRecognizer: SpeechRecognizer? = null
 
+    // System voice recognition fallback launcher (guaranteed to work across all Android versions/OEM skins)
+    private val voiceLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        setMicActive(false)
+        if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+            val matches = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            val spokenText = matches?.firstOrNull()
+            if (!spokenText.isNullOrBlank()) {
+                sendUserMessage(spokenText)
+            }
+        }
+        evalJs("RoamieAndroid.showHandsBadge(null); RoamieAndroid.setSpeechRipple(false, 0);")
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -83,13 +98,13 @@ class MainActivity : AppCompatActivity() {
         setupChatBar()
         setupSpeechRecognizer()
 
-        // Welcome utterance if first launch
+        // Welcome utterance on startup
         mainHandler.postDelayed({
             activityScope.launch {
                 if (auth.apiKey.isBlank()) {
-                    ttsClient.speak("J.A.R.V.I.S. online. Tap the settings icon at the top right to paste your Gemini API key so we can chat, sir!")
+                    ttsClient.speak("J.A.R.V.I.S. online. Tap the settings gear icon at the top right to paste your Gemini API key, sir!")
                 } else {
-                    ttsClient.speak("J.A.R.V.I.S. online and standing by. How may I assist you, sir?")
+                    ttsClient.speak("J.A.R.V.I.S. online. Arc Reactor calibrated. How may I assist you, sir?")
                 }
             }
         }, 1500L)
@@ -230,11 +245,36 @@ class MainActivity : AppCompatActivity() {
         }
 
         btnMic.setOnClickListener {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), 200)
-            } else {
+            checkAndStartVoice()
+        }
+    }
+
+    private fun checkAndStartVoice() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), 200)
+        } else {
+            startVoiceListening()
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 200) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 startVoiceListening()
+            } else {
+                Toast.makeText(this, "Microphone permission required for voice interaction.", Toast.LENGTH_SHORT).show()
             }
+        }
+    }
+
+    private fun setMicActive(active: Boolean) {
+        if (active) {
+            btnMic.setColorFilter(ContextCompat.getColor(this, R.color.accent_cyan))
+            btnMic.animate().scaleX(1.15f).scaleY(1.15f).setDuration(150).start()
+        } else {
+            btnMic.clearColorFilter()
+            btnMic.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
         }
     }
 
@@ -242,7 +282,7 @@ class MainActivity : AppCompatActivity() {
         activityScope.launch {
             val lower = userText.lowercase()
 
-            // Quick client-side intercept for Pomodoro commands
+            // Quick client-side intercept for Pomodoro focus commands
             if (lower.contains("pomodoro") || lower.contains("focus timer") || lower.contains("start focus") || lower.contains("focus sprint")) {
                 var seconds = 1500L // 25 min
                 if (lower.contains("5 min") || lower.contains("break")) seconds = 300L
@@ -304,50 +344,89 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupSpeechRecognizer() {
-        if (!SpeechRecognizer.isRecognitionAvailable(this)) return
-        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this).apply {
-            setRecognitionListener(object : RecognitionListener {
-                override fun onReadyForSpeech(params: Bundle?) {
-                    evalJs("RoamieAndroid.showHandsBadge('Listening...');")
-                }
-                override fun onBeginningOfSpeech() {}
-                override fun onRmsChanged(rmsdB: Float) {
-                    val normalized = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f)
-                    evalJs("RoamieAndroid.setSpeechRipple(false, $normalized);")
-                }
-                override fun onBufferReceived(buffer: ByteArray?) {}
-                override fun onEndOfSpeech() {
-                    evalJs("RoamieAndroid.showHandsBadge('Thinking...');")
-                }
-                override fun onError(error: Int) {
-                    evalJs("RoamieAndroid.showHandsBadge(null); RoamieAndroid.setSpeechRipple(false, 0);")
-                }
-                override fun onResults(results: Bundle?) {
-                    val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                    val text = matches?.firstOrNull()
-                    if (!text.isNullOrBlank()) {
-                        sendUserMessage(text)
-                    } else {
-                        evalJs("RoamieAndroid.showHandsBadge(null);")
+        try {
+            speechRecognizer?.destroy()
+            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this).apply {
+                setRecognitionListener(object : RecognitionListener {
+                    override fun onReadyForSpeech(params: Bundle?) {
+                        setMicActive(true)
+                        evalJs("RoamieAndroid.showHandsBadge('Listening...');")
                     }
-                }
-                override fun onPartialResults(partialResults: Bundle?) {}
-                override fun onEvent(eventType: Int, params: Bundle?) {}
-            })
+                    override fun onBeginningOfSpeech() {}
+                    override fun onRmsChanged(rmsdB: Float) {
+                        val normalized = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f)
+                        evalJs("RoamieAndroid.setSpeechRipple(false, $normalized);")
+                    }
+                    override fun onBufferReceived(buffer: ByteArray?) {}
+                    override fun onEndOfSpeech() {
+                        setMicActive(false)
+                        evalJs("RoamieAndroid.showHandsBadge('Thinking...');")
+                    }
+                    override fun onError(error: Int) {
+                        setMicActive(false)
+                        evalJs("RoamieAndroid.showHandsBadge(null); RoamieAndroid.setSpeechRipple(false, 0);")
+                        // If in-process recognition encounters an error, fallback to system voice popup
+                        if (error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
+                            // User remained silent, no need to fallback
+                        } else {
+                            launchSystemVoiceFallback()
+                        }
+                    }
+                    override fun onResults(results: Bundle?) {
+                        setMicActive(false)
+                        val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                        val text = matches?.firstOrNull()
+                        if (!text.isNullOrBlank()) {
+                            sendUserMessage(text)
+                        } else {
+                            evalJs("RoamieAndroid.showHandsBadge(null);")
+                        }
+                    }
+                    override fun onPartialResults(partialResults: Bundle?) {}
+                    override fun onEvent(eventType: Int, params: Bundle?) {}
+                })
+            }
+        } catch (e: Exception) {
+            speechRecognizer = null
+        }
+    }
+
+    private fun launchSystemVoiceFallback() {
+        try {
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak to J.A.R.V.I.S...")
+            }
+            voiceLauncher.launch(intent)
+        } catch (e: Exception) {
+            Toast.makeText(this, "Voice input service unavailable", Toast.LENGTH_SHORT).show()
         }
     }
 
     private fun startVoiceListening() {
         mainHandler.post {
             ttsClient.stop()
+            setMicActive(true)
+            evalJs("RoamieAndroid.showHandsBadge('Listening...');")
+
+            if (speechRecognizer == null) {
+                setupSpeechRecognizer()
+            }
+
             val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                 putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+                putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak to J.A.R.V.I.S...")
             }
+
             try {
-                speechRecognizer?.startListening(intent)
+                if (speechRecognizer != null) {
+                    speechRecognizer?.startListening(intent)
+                } else {
+                    launchSystemVoiceFallback()
+                }
             } catch (e: Exception) {
-                e.printStackTrace()
+                launchSystemVoiceFallback()
             }
         }
     }
@@ -363,7 +442,12 @@ class MainActivity : AppCompatActivity() {
         val provIndex = providers.indexOfFirst { it.equals(auth.provider, ignoreCase = true) }.coerceAtLeast(0)
         spinnerProv.setSelection(provIndex)
 
-        etModel.setText(auth.model.ifBlank { "gemini-1.5-flash" })
+        // Ensure clean model name is presented
+        var cleanModel = auth.model.trim().removePrefix("models/")
+        if (cleanModel.contains("2.5") || cleanModel.isBlank()) {
+            cleanModel = "gemini-1.5-flash"
+        }
+        etModel.setText(cleanModel)
         etKey.setText(auth.apiKey)
 
         AlertDialog.Builder(this)
@@ -371,11 +455,15 @@ class MainActivity : AppCompatActivity() {
             .setView(dialogView)
             .setPositiveButton("Save") { _, _ ->
                 auth.provider = spinnerProv.selectedItem.toString().lowercase()
-                auth.model = etModel.text.toString().trim().ifBlank { "gemini-1.5-flash" }
+                var modelInput = etModel.text.toString().trim().removePrefix("models/")
+                if (modelInput.contains("2.5") || modelInput.isBlank()) {
+                    modelInput = "gemini-1.5-flash"
+                }
+                auth.model = modelInput
                 auth.apiKey = etKey.text.toString().trim()
-                Toast.makeText(this, "Settings saved! J.A.R.V.I.S. is ready.", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Settings saved! Using $modelInput", Toast.LENGTH_SHORT).show()
                 activityScope.launch {
-                    ttsClient.speak("Settings updated, sir. Arc Reactor and Gemini 1.5 Flash are calibrated.")
+                    ttsClient.speak("Settings updated, sir. Arc Reactor and $modelInput are calibrated.")
                 }
             }
             .setNegativeButton("Cancel", null)
