@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Roamies</string>
+    <string name="accessibility_service_description">Roamies Hands Helper: Allows Roamie to inspect screen elements, guide your steps, ring buttons, and automate taps when you ask.</string>
+</resources>
