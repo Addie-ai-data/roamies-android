@@ -22,7 +22,6 @@
         android:roundIcon="@drawable/ic_launcher"
         android:supportsRtl="true"
         android:theme="@style/Theme.Roamies"
-        android:usesCleartextTraffic="true"
         tools:targetApi="34">
 
         <activity
