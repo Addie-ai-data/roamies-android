@@ -116,8 +116,11 @@ class LlmClient(
     }
 
     private fun callGemini(systemPrompt: String, userPrompt: String): String {
-        val apiKey = auth.apiKey
-        val model = auth.modelId.ifEmpty { "gemini-2.5-flash" }
+        val apiKey = auth.apiKey.trim()
+        if (apiKey.isBlank()) {
+            return "Please tap the settings gear at the top right to paste your API key!"
+        }
+        val model = if (auth.modelId.isBlank() || auth.modelId.contains("2.5")) "gemini-1.5-flash" else auth.modelId.trim()
         val url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey"
 
         val bodyJson = JSONObject().apply {
@@ -140,7 +143,7 @@ class LlmClient(
 
         val response = http.newCall(request).execute()
         val resBody = response.body?.string().orEmpty()
-        if (!response.isSuccessful) return "Error from Gemini: ${response.code} $resBody"
+        if (!response.isSuccessful) return "Gemini API error ${response.code}. Please verify your API key in Settings."
 
         val root = JSONObject(resBody)
         val candidates = root.optJSONArray("candidates") ?: return ""

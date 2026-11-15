@@ -1,327 +1,194 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/bg_dark"
-    android:padding="20dp">
+    android:background="@color/bg_dark">
 
+    <!-- The 1:1 Roamies Canvas Stage (Interactive Buddy) -->
+    <WebView
+        android:id="@+id/webViewRoamie"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- Top Bar Overlay -->
     <LinearLayout
+        android:id="@+id/topBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:layout_alignParentTop="true"
+        android:paddingHorizontal="16dp"
+        android:paddingTop="36dp"
+        android:paddingBottom="12dp"
+        android:background="#A00B0F19"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
 
-        <!-- Header -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:layout_marginBottom="24dp">
+        <ImageView
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@drawable/ic_launcher"
+            android:contentDescription="Roamies Icon" />
 
-            <ImageView
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:src="@drawable/ic_launcher"
-                android:contentDescription="Roamies Logo" />
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="16dp"
-                android:orientation="vertical">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Roamies"
-                    android:textColor="@color/accent_cyan"
-                    android:textSize="22sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Your on-screen AI companion"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="13sp" />
-            </LinearLayout>
-        </LinearLayout>
-
-        <!-- Master Switch / Start Card -->
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="20dp"
-            app:cardBackgroundColor="@color/card_dark"
-            app:strokeColor="@color/accent_cyan"
-            app:strokeWidth="1dp"
-            app:cardCornerRadius="16dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="20dp">
-
-                <TextView
-                    android:id="@+id/tvServiceStatus"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Status: Inactive"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="14sp"
-                    android:layout_marginBottom="12dp" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnToggleOverlay"
-                    android:layout_width="match_parent"
-                    android:layout_height="56dp"
-                    android:text="Start Floating Roamie"
-                    android:textSize="16sp"
-                    android:textColor="@color/bg_dark"
-                    app:backgroundTint="@color/accent_cyan"
-                    app:cornerRadius="12dp" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- Permissions Section -->
         <TextView
-            android:layout_width="wrap_content"
+            android:id="@+id/tvActiveBuddy"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="REQUIRED PERMISSIONS"
+            android:layout_weight="1"
+            android:layout_marginStart="12dp"
+            android:text="JARVIS"
             android:textColor="@color/accent_cyan"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:letterSpacing="0.1"
-            android:layout_marginBottom="10dp" />
+            android:textSize="18sp"
+            android:textStyle="bold" />
 
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="20dp"
-            app:cardBackgroundColor="@color/card_dark"
-            app:cardCornerRadius="14dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:layout_marginBottom="12dp">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="Display Over Other Apps"
-                        android:textColor="@color/text_primary"
-                        android:textSize="15sp" />
-
-                    <Button
-                        android:id="@+id/btnPermOverlay"
-                        android:layout_width="wrap_content"
-                        android:layout_height="36dp"
-                        android:text="Grant"
-                        android:textSize="12sp" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:layout_marginBottom="12dp">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="Microphone (Speech Input)"
-                        android:textColor="@color/text_primary"
-                        android:textSize="15sp" />
-
-                    <Button
-                        android:id="@+id/btnPermMic"
-                        android:layout_width="wrap_content"
-                        android:layout_height="36dp"
-                        android:text="Grant"
-                        android:textSize="12sp" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="Accessibility (Hands Helper)"
-                        android:textColor="@color/text_primary"
-                        android:textSize="15sp" />
-
-                    <Button
-                        android:id="@+id/btnPermAccessibility"
-                        android:layout_width="wrap_content"
-                        android:layout_height="36dp"
-                        android:text="Enable"
-                        android:textSize="12sp" />
-                </LinearLayout>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- Companion Settings -->
-        <TextView
+        <!-- Size Toggle Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnToggleSize"
+            style="@style/Widget.Material3.Button.TonalButton"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="COMPANION SETTINGS"
-            android:textColor="@color/accent_cyan"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:letterSpacing="0.1"
-            android:layout_marginBottom="10dp" />
+            android:layout_height="38dp"
+            android:text="Size: Default"
+            android:textSize="11sp"
+            android:textColor="@color/text_primary"
+            app:backgroundTint="#2000F5D4"
+            android:layout_marginEnd="8dp" />
 
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="20dp"
-            app:cardBackgroundColor="@color/card_dark"
-            app:cardCornerRadius="14dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Pick Your Roamie"
-                    android:textColor="@color/text_primary"
-                    android:textSize="14sp"
-                    android:layout_marginBottom="6dp" />
-
-                <Spinner
-                    android:id="@+id/spinnerCharacter"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:background="@color/bg_dark"
-                    android:layout_marginBottom="16dp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Size"
-                    android:textColor="@color/text_primary"
-                    android:textSize="14sp"
-                    android:layout_marginBottom="6dp" />
-
-                <Spinner
-                    android:id="@+id/spinnerSize"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:background="@color/bg_dark" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- AI Provider Settings -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="AI BRAIN CONFIGURATION"
-            android:textColor="@color/accent_cyan"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:letterSpacing="0.1"
-            android:layout_marginBottom="10dp" />
-
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="24dp"
-            app:cardBackgroundColor="@color/card_dark"
-            app:cardCornerRadius="14dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Provider"
-                    android:textColor="@color/text_primary"
-                    android:textSize="14sp"
-                    android:layout_marginBottom="6dp" />
-
-                <Spinner
-                    android:id="@+id/spinnerProvider"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:background="@color/bg_dark"
-                    android:layout_marginBottom="14dp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Model"
-                    android:textColor="@color/text_primary"
-                    android:textSize="14sp"
-                    android:layout_marginBottom="6dp" />
-
-                <EditText
-                    android:id="@+id/etModel"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:background="@color/bg_dark"
-                    android:textColor="@color/text_primary"
-                    android:hint="gemini-2.5-flash"
-                    android:textColorHint="@color/text_secondary"
-                    android:paddingHorizontal="12dp"
-                    android:layout_marginBottom="14dp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="API Key"
-                    android:textColor="@color/text_primary"
-                    android:textSize="14sp"
-                    android:layout_marginBottom="6dp" />
-
-                <EditText
-                    android:id="@+id/etApiKey"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:background="@color/bg_dark"
-                    android:textColor="@color/text_primary"
-                    android:inputType="textPassword"
-                    android:hint="Paste API Key"
-                    android:textColorHint="@color/text_secondary"
-                    android:paddingHorizontal="12dp"
-                    android:layout_marginBottom="16dp" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnSaveSettings"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:text="Save Settings"
-                    app:backgroundTint="@color/accent_cyan_dim"
-                    app:cornerRadius="8dp" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
+        <!-- Settings Button -->
+        <ImageButton
+            android:id="@+id/btnOpenSettings"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_menu_manage"
+            app:tint="@color/accent_cyan"
+            android:contentDescription="Settings" />
     </LinearLayout>
-</ScrollView>
+
+    <!-- Character Selector Horizontal Chips -->
+    <HorizontalScrollView
+        android:id="@+id/characterChipsScroll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/topBar"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="6dp"
+        android:scrollbars="none"
+        android:background="#800B0F19">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/chipJarvis"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="JARVIS (3D Sphere)"
+                android:textSize="11sp"
+                android:textColor="@color/text_primary"
+                android:layout_marginEnd="8dp"
+                app:strokeColor="@color/accent_cyan" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/chipRoamie"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="Roamie (Pixel)"
+                android:textSize="11sp"
+                android:textColor="@color/text_primary"
+                android:layout_marginEnd="8dp"
+                app:strokeColor="@color/border_color" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/chipAnime"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="Anime Girl"
+                android:textSize="11sp"
+                android:textColor="@color/text_primary"
+                android:layout_marginEnd="8dp"
+                app:strokeColor="@color/border_color" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/chipSarah"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="Sarah"
+                android:textSize="11sp"
+                android:textColor="@color/text_primary"
+                android:layout_marginEnd="8dp"
+                app:strokeColor="@color/border_color" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/chipAdrian"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="Adrian"
+                android:textSize="11sp"
+                android:textColor="@color/text_primary"
+                app:strokeColor="@color/border_color" />
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <!-- Bottom Chat Interaction Bar -->
+    <LinearLayout
+        android:id="@+id/bottomChatBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:paddingHorizontal="16dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="24dp"
+        android:background="#D00B0F19"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <!-- Mic Button (Speech Input) -->
+        <ImageButton
+            android:id="@+id/btnMic"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
+            android:background="@drawable/ic_launcher"
+            android:backgroundTint="@color/card_dark"
+            android:src="@android:drawable/ic_btn_speak_now"
+            app:tint="@color/accent_cyan"
+            android:layout_marginEnd="8dp"
+            android:contentDescription="Voice Input" />
+
+        <!-- Text Input Field -->
+        <EditText
+            android:id="@+id/etUserPrompt"
+            android:layout_width="0dp"
+            android:layout_height="46dp"
+            android:layout_weight="1"
+            android:background="@drawable/ic_launcher"
+            android:backgroundTint="@color/card_dark"
+            android:hint="Talk to your Roamie..."
+            android:textColorHint="@color/text_secondary"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp"
+            android:paddingHorizontal="14dp"
+            android:imeOptions="actionSend"
+            android:inputType="textCapSentences|textAutoCorrect"
+            android:maxLines="3" />
+
+        <!-- Send Button -->
+        <ImageButton
+            android:id="@+id/btnSend"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/ic_launcher"
+            android:backgroundTint="@color/accent_cyan"
+            android:src="@android:drawable/ic_menu_send"
+            app:tint="@color/bg_dark"
+            android:contentDescription="Send" />
+    </LinearLayout>
+
+</RelativeLayout>
